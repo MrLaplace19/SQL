@@ -41,6 +41,13 @@ SELECT sex, education, COUNT(*) AS applicant_count
 FROM headhunter.unemployed
 GROUP BY CUBE(sex, education);
 
+-- 1.4.3
+SELECT education_min,
+       SUM(salary_from) FILTER (WHERE status = 'Активна') AS total_min_salary
+FROM headhunter.vacancy
+GROUP BY ALL education_min
+ORDER BY education_min;
+
 -- 1.5
 SELECT title, address, phone_number
 FROM headhunter.company
@@ -118,17 +125,18 @@ FROM headhunter.vacancy AS v
 RIGHT JOIN headhunter.company AS c ON v.company_id=c.id AND v.salary_from>=150000;
 
 -- 2.5.1
-SELECT c.title, COUNT(v.id) AS count_vac, AVG(v.salary_from) AS avg_min_salary
-FROM headhunter.company AS c
-LEFT JOIN headhunter.vacancy AS v ON c.id = v.company_id
-GROUP BY c.id, c.title;
-
--- 2.5.2
-SELECT c.title AS company_title, COUNT(DISTINCT em.unemployed_id) AS count_em
+SELECT c.title, AVG(v.salary_from) AS avg_min_salary
 FROM headhunter.company AS c
 LEFT JOIN headhunter.vacancy AS v ON v.company_id = c.id
-LEFT JOIN headhunter.employment AS em ON em.vacancy_id = v.id
-GROUP BY c.id, c.title;
+GROUP BY c.id, c.title
+ORDER BY c.id;
+
+-- 2.5.2
+SELECT u.sex, COUNT(DISTINCT u.id) AS hired_count
+FROM headhunter.employment AS em
+JOIN headhunter.unemployed AS u ON u.id = em.unemployed_id
+GROUP BY u.sex
+ORDER BY u.sex;
 
 -- 2.6.1
 SELECT c.title, AVG(v.salary_from)

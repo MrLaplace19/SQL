@@ -206,6 +206,30 @@ GROUP BY CUBE(sex, education);
 
 ![Выполнение задания 1.4.2 в DBeaver](screenshots/1.4.2.png)
 
+### 1.4.3 Сохранение групп с GROUP BY ALL
+
+**Вопрос:** Какова сумма нижних границ зарплаты по активным вакансиям для каждого уровня образования? Вывести и те уровни, для которых нет активных вакансий.
+
+**Ожидаемый результат:**
+
+| Требуемое образование | Сумма нижних границ зарплаты, ₽ |
+| --- | ---: |
+| Среднее специальное | `NULL` |
+| Высшее | 560 000 |
+
+
+**SQL-запрос**
+
+```sql
+SELECT education_min,
+       SUM(salary_from) FILTER (WHERE status = 'Активна') AS total_min_salary
+FROM headhunter.vacancy
+GROUP BY ALL education_min
+ORDER BY education_min;
+```
+
+![Выполнение задания 1.4.3 в DBeaver на PostgreSQL](screenshots/1.4.3.png)
+
 ### 1.5 Отбор названий с NOT LIKE
 
 **Вопрос:** Какие предприятия не содержат последовательность букв `Market` в названии? Вывести название, адрес и телефон предприятия.
@@ -434,7 +458,7 @@ RIGHT JOIN headhunter.position AS p ON v.position_id = p.id AND v.status='Акт
 
 ### 2.4.2 Правое соединение вакансий с предприятиями
 
-**Вопрос:** Как с помощью RIGHT JOIN вывести все предприятия и нижнюю границу зарплаты их вакансий с нижней границей не менее 150 000 рублей, сохранив предприятия без таких вакансий?
+**Вопрос:** Как с помощью `RIGHT JOIN` вывести все предприятия и нижние границы зарплат от 150 000 рублей? Для предприятия без подходящих вакансий вывести `NULL` в столбце зарплаты.
 
 **Ожидаемый результат:**
 
@@ -456,55 +480,51 @@ RIGHT JOIN headhunter.company AS c ON v.company_id=c.id AND v.salary_from>=15000
 
 ![Выполнение задания 2.4.2 в DBeaver](screenshots/2.4.2.png)
 
-### 2.5.1 Группировка вакансий по предприятию
+### 2.5.1 Средняя нижняя граница зарплаты по предприятию
 
-**Вопрос:** Сколько вакансий разместило каждое предприятие и какова средняя нижняя граница зарплаты по его вакансиям? Вывести название предприятия, количество и среднее значение, включая предприятия без вакансий.
+**Вопрос:** Какова средняя нижняя граница зарплаты по вакансиям каждого предприятия? Включить предприятия без вакансий.
 
 **Ожидаемый результат:**
 
-| Предприятие | Вакансий | Средняя нижняя граница зарплаты, ₽ |
-| --- | ---: | ---: |
-| Northwind Systems | 1 | 180 000 |
-| Vector Logistics | 1 | 120 000 |
-| Bright Studio | 1 | 100 000 |
-| Data Forge | 1 | 160 000 |
-| Green Market | 1 | 90 000 |
-
-Для предприятия без вакансий счетчик равен `0`, а средняя зарплата — `NULL`.
+| Предприятие | Средняя нижняя граница зарплаты, ₽ |
+| --- | ---: |
+| Northwind Systems | 180 000 |
+| Vector Logistics | 120 000 |
+| Bright Studio | 100 000 |
+| Data Forge | 160 000 |
+| Green Market | 90 000 |
 
 **SQL-запрос**
 
 ```sql
-SELECT c.title, COUNT(v.id) AS count_vac, AVG(v.salary_from) AS avg_min_salary
+SELECT c.title, AVG(v.salary_from) AS avg_min_salary
 FROM headhunter.company AS c
-LEFT JOIN headhunter.vacancy AS v ON c.id = v.company_id
-GROUP BY c.id, c.title;
+LEFT JOIN headhunter.vacancy AS v ON v.company_id = c.id
+GROUP BY c.id, c.title
+ORDER BY c.id;
 ```
 
 ![Выполнение задания 2.5.1 в DBeaver](screenshots/2.5.1.png)
 
-### 2.5.2 Группировка трудоустройств по предприятию
+### 2.5.2 Число трудоустроенных по полу
 
-**Вопрос:** Сколько разных соискателей было трудоустроено в каждое предприятие за всю историю агентства, включая впоследствии уволенных? Вывести все предприятия, в том числе с нулевым количеством.
+**Вопрос:** Сколько мужчин и женщин трудоустроило агентство за всё время? Считать каждого соискателя один раз.
 
 **Ожидаемый результат:**
 
-| Предприятие | Трудоустроено соискателей |
+| Пол | Трудоустроено соискателей |
 | --- | ---: |
-| Northwind Systems | 1 |
-| Vector Logistics | 1 |
-| Bright Studio | 1 |
-| Data Forge | 1 |
-| Green Market | 1 |
+| Мужской | 2 |
+| Женский | 3 |
 
 **SQL-запрос**
 
 ```sql
-SELECT c.title AS company_title, COUNT(DISTINCT em.unemployed_id) AS count_em
-FROM headhunter.company AS c
-LEFT JOIN headhunter.vacancy AS v ON v.company_id = c.id
-LEFT JOIN headhunter.employment AS em ON em.vacancy_id = v.id
-GROUP BY c.id, c.title;
+SELECT u.sex, COUNT(DISTINCT u.id) AS hired_count
+FROM headhunter.employment AS em
+JOIN headhunter.unemployed AS u ON u.id = em.unemployed_id
+GROUP BY u.sex
+ORDER BY u.sex;
 ```
 
 ![Выполнение задания 2.5.2 в DBeaver](screenshots/2.5.2.png)
@@ -721,7 +741,7 @@ SELECT * FROM headhunter.vw_vacancy_details;
 
 ### 3.1.2 Представление со статистикой трудоустройств
 
-**Вопрос:** Как создать представление `headhunter.vw_company_employment_stats` на основе задания 2.5.2 и получить из него количество разных трудоустроенных соискателей по каждому предприятию за всю историю?
+**Вопрос:** Как создать представление `headhunter.vw_company_employment_stats` с числом разных трудоустроенных соискателей по каждому предприятию за всю историю?
 
 **Ожидаемый результат:**
 
@@ -1219,30 +1239,61 @@ CROSS JOIN LATERAL (
 
 ## Часть 2
 
-### a Подбор вакансий конкретному соискателю
+### a Подбор вакансий для Alexey Smirnov
 
-**Вопрос:** Какие активные вакансии подходят безработной Olga Fedorova по полу, возрасту и образованию на контрольную дату? Вывести предприятие, должность, границы зарплаты и требования. При подборе проверять только перечисленные требования, без дополнительного отбора по желаемой должности.
-
-**Ожидаемый результат:**
-
-| Предприятие | Должность | Зарплата от, ₽ | Зарплата до, ₽ | Пол | Возраст | Минимальное образование |
-| --- | --- | ---: | ---: | --- | --- | --- |
-
-В результате **0 строк**. У Olga Fedorova среднее специальное образование, а все активные вакансии требуют высшего. Подходящая по требованиям вакансия Green Market завершена.
-
-### b Наиболее и наименее востребованные должности
-
-**Вопрос:** Какие должности наиболее и наименее востребованы, если востребованность определяется количеством активных вакансий? Учитывать все должности справочника, в том числе с нулевым количеством, и вывести все совпадения на максимуме и минимуме.
+**Вопрос:** Какие активные вакансии подходят Alexey Smirnov по полу, возрасту и образованию? Вывести должность и нижнюю границу зарплаты. Возраст считать на 1 сентября 2026 года.
 
 **Ожидаемый результат:**
 
-| Должность | Активных вакансий | Категория |
-| --- | ---: | --- |
-| Backend Developer | 1 | Наиболее востребованная |
-| Logistics Manager | 1 | Наиболее востребованная |
-| Graphic Designer | 1 | Наиболее востребованная |
-| Data Analyst | 1 | Наиболее востребованная |
-| Sales Manager | 0 | Наименее востребованная |
+| Должность | Зарплата от, ₽ |
+| --- | ---: |
+| Backend Developer | 180 000 |
+| Data Analyst | 160 000 |
+| Graphic Designer | 100 000 |
+| Logistics Manager | 120 000 |
+
+**SQL-запрос**
+
+```sql
+SELECT p.title AS position_title, v.salary_from
+FROM headhunter.vacancy AS v
+JOIN headhunter.position AS p ON p.id = v.position_id
+CROSS JOIN headhunter.unemployed AS u
+WHERE u.full_name = 'Alexey Smirnov'
+  AND v.status = 'Активна'
+  AND (v.sex = 'Не важен' OR v.sex = u.sex)
+  AND EXTRACT(YEAR FROM AGE(DATE '2026-09-01', u.birth_date)) BETWEEN v.age_from AND v.age_to
+  AND u.education >= v.education_min
+ORDER BY p.title;
+```
+
+![Выполнение пункта a второй части в DBeaver](screenshots/part2-a.png)
+
+### b Должности по числу активных вакансий
+
+**Вопрос:** Сколько активных вакансий есть по каждой должности? Вывести все должности по убыванию количества, включая должности без активных вакансий.
+
+**Ожидаемый результат:**
+
+| Должность | Активных вакансий |
+| --- | ---: |
+| Backend Developer | 1 |
+| Data Analyst | 1 |
+| Graphic Designer | 1 |
+| Logistics Manager | 1 |
+| Sales Manager | 0 |
+
+**SQL-запрос**
+
+```sql
+SELECT p.title, COUNT(v.id) AS active_count
+FROM headhunter.position AS p
+LEFT JOIN headhunter.vacancy AS v ON v.position_id = p.id AND v.status = 'Активна'
+GROUP BY p.id, p.title
+ORDER BY active_count DESC, p.title;
+```
+
+![Выполнение пункта b второй части в DBeaver](screenshots/part2-b.png)
 
 ### c Предприятия с ограничениями по возрасту и полу
 
@@ -1258,6 +1309,30 @@ CROSS JOIN LATERAL (
 | Data Forge | Data Analyst | 23–45 | Не важен | Да | Нет |
 | Green Market | Sales Manager | 20–45 | Не важен | Да | Нет |
 
+**SQL-запрос**
+
+```sql
+WITH vacancy_limits AS (
+    SELECT v.*,
+           v.age_from IS NOT NULL AND v.age_to IS NOT NULL AS age_restricted,
+           v.sex <> 'Не важен' AS sex_restricted
+    FROM headhunter.vacancy AS v
+)
+SELECT c.title AS company_title,
+       p.title AS position_title,
+       CONCAT(v.age_from, '–', v.age_to) AS age_range,
+       v.sex,
+       CASE WHEN v.age_restricted THEN 'Да' ELSE 'Нет' END AS age_restricted,
+       CASE WHEN v.sex_restricted THEN 'Да' ELSE 'Нет' END AS sex_restricted
+FROM vacancy_limits AS v
+JOIN headhunter.company AS c ON c.id = v.company_id
+JOIN headhunter.position AS p ON p.id = v.position_id
+WHERE v.age_restricted OR v.sex_restricted
+ORDER BY c.id, v.id;
+```
+
+![Выполнение пункта c второй части в DBeaver](screenshots/part2-c.png)
+
 ### d Соискатели младше 25 лет с высшим образованием
 
 **Вопрос:** Сколько соискателей в реестре `unemployed` на контрольную дату младше 25 лет и имеют высшее образование?
@@ -1268,13 +1343,25 @@ CROSS JOIN LATERAL (
 | ---: |
 | 0 |
 
-### e Отчет о работе кадрового агентства
+**SQL-запрос**
 
-**Вопрос:** Как составить отчет за всю историю агентства по каждому предприятию в формате «Предприятие | Кол-во трудоустроенных | М | Ж | Высшее обр. | Среднее спец. | до 40 лет | после 40»? Учитывать разных людей, включая впоследствии уволенных; возраст определять на дату первого трудоустройства человека в соответствующее предприятие. В столбец «до 40 лет» включать людей младше 40 лет, а в столбец «после 40» — людей 40 лет и старше, чтобы не терять возраст ровно 40 лет. Предприятия без трудоустройств выводить с нулями.
+```sql
+SELECT COUNT(*) AS applicant_count
+FROM headhunter.unemployed AS u
+WHERE u.education = 'Высшее'
+  AND EXTRACT(YEAR FROM AGE(DATE '2026-09-01', u.birth_date)) BETWEEN 0 AND 24
+  AND u.birth_date <= DATE '2026-09-01';
+```
+
+![Выполнение пункта d второй части в DBeaver](screenshots/part2-d.png)
+
+### e Отчёт о трудоустройствах по предприятиям
+
+**Вопрос:** Сколько трудоустройств было у каждого предприятия? Вывести общее количество и разбивку по полу, образованию и возрасту. Возраст считать на 1 сентября 2026 года. Учитывать все записи о трудоустройстве, включая те, по которым сотрудник уже уволился.
 
 **Ожидаемый результат:**
 
-| Предприятие | Кол-во трудоустроенных | М | Ж | Высшее обр. | Среднее спец. | до 40 лет | после 40 |
+| Предприятие | Трудоустройств | М | Ж | Высшее обр. | Среднее спец. | До 40 лет | 40 лет и старше |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Northwind Systems | 1 | 1 | 0 | 1 | 0 | 1 | 0 |
 | Vector Logistics | 1 | 0 | 1 | 1 | 0 | 1 | 0 |
@@ -1282,4 +1369,23 @@ CROSS JOIN LATERAL (
 | Data Forge | 1 | 1 | 0 | 1 | 0 | 1 | 0 |
 | Green Market | 1 | 0 | 1 | 0 | 1 | 1 | 0 |
 
-В отчете учитывается трудоустройство Olga Fedorova в Green Market, несмотря на последующее увольнение.
+**SQL-запрос**
+
+```sql
+SELECT c.title AS "Предприятие",
+       COUNT(em.id) AS "Трудоустройств",
+       COUNT(*) FILTER (WHERE u.sex = 'Мужской') AS "М",
+       COUNT(*) FILTER (WHERE u.sex = 'Женский') AS "Ж",
+       COUNT(*) FILTER (WHERE u.education = 'Высшее') AS "Высшее обр.",
+       COUNT(*) FILTER (WHERE u.education = 'Среднее специальное') AS "Среднее спец.",
+       COUNT(*) FILTER (WHERE u.birth_date > DATE '2026-09-01' - INTERVAL '40 years') AS "До 40 лет",
+       COUNT(*) FILTER (WHERE u.birth_date <= DATE '2026-09-01' - INTERVAL '40 years') AS "40 лет и старше"
+FROM headhunter.company AS c
+LEFT JOIN headhunter.vacancy AS v ON v.company_id = c.id
+LEFT JOIN headhunter.employment AS em ON em.vacancy_id = v.id
+LEFT JOIN headhunter.unemployed AS u ON u.id = em.unemployed_id
+GROUP BY c.id, c.title
+ORDER BY c.id;
+```
+
+![Выполнение пункта e второй части в DBeaver](screenshots/part2-e.png)
